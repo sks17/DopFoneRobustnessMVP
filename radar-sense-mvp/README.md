@@ -31,3 +31,24 @@ RADAR-Sense-MVP is a minimal research benchmark for evaluating robustness of Dop
 2. Install `requirements.txt`.
 3. Run `pytest`.
 4. Use the scripts in `scripts/` to generate data and run the benchmark.
+
+## Accreditations:
+
+@article{gu2025radar,
+
+  title={RADAR: Benchmarking Language Models on Imperfect Tabular Data}, 
+
+  author={Ken Gu and Zhihan Zhang and Kate Lin and Yuwei Zhang and Akshay Paruchuri and Hong Yu and Mehran Kazemi and Kumar Ayush and A. 
+  Ali Heydari and Maxwell A. Xu and Girish Narayanswamy and Yun Liu and Ming-Zher Poh and Yuzhe Yang and Mark Malhotra and Shwetak Patel
+   and Hamid Palangi and Xuhai Xu and Daniel McDuff and Tim Althoff and Xin Liu},
+
+  year={2025},
+
+  eprint={2506.08249},
+
+  archivePrefix={arXiv},
+
+  primaryClass={cs.DB},
+  
+  url={https://arxiv.org/abs/2506.08249}, 
+}
