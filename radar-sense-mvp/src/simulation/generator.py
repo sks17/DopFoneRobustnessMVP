@@ -5,8 +5,12 @@ from __future__ import annotations
 import numpy as np
 
 from datatypes.signal_example import SignalExample
-from simulation.doppler_like import generate_carrier_wave, modulate_carrier_with_envelope
-from simulation.heartbeat import build_time_axis, generate_heartbeat_envelope
+from simulation.doppler_like import (
+    generate_carrier_wave,
+    generate_heartbeat_envelope,
+    modulate_carrier_with_envelope,
+)
+from simulation.heartbeat import build_time_axis
 
 
 # Spec:

@@ -45,3 +45,31 @@ This file records each added datatype, method, test, and supporting project arti
 - Added function `modulate_carrier_with_envelope` in `src/simulation/doppler_like.py`.
 - Added function `generate_clean_signal_example` in `src/simulation/generator.py`.
 - Added simulation test file `tests/test_doppler_like.py` with one-case, two-case, many-case, branch-case, and statement-case coverage.
+- Replaced the old heartbeat-envelope helper layer in `src/simulation/heartbeat.py` with a smaller heartbeat-timing layer focused on beat timestamps, optional physiological jitter, sampled time axes, and binary pulse-train generation.
+- Added function `bpm_to_seconds_per_beat` in `src/simulation/heartbeat.py`.
+- Added function `generate_beat_timestamps` in `src/simulation/heartbeat.py`.
+- Added function `add_physiological_jitter` in `src/simulation/heartbeat.py`.
+- Retained and narrowed function `build_time_axis` in `src/simulation/heartbeat.py` for sampled pulse-train support.
+- Added function `generate_pulse_train` in `src/simulation/heartbeat.py`.
+- Replaced `tests/test_heartbeat.py` with tests for one-case, two-case, many-case, branch-case, and statement-case coverage across the heartbeat-timing functions.
+- Added function `generate_heartbeat_envelope` in `src/simulation/doppler_like.py`.
+  - Composes `generate_beat_timestamps` + `generate_pulse_train` + Gaussian convolution to produce a smooth [0, 1] envelope from a heart-rate label.
+  - Kernel half-width is capped to the signal length so `np.convolve(mode="same")` always returns the correct shape.
+- Added function `apply_amplitude_scaling` in `src/simulation/doppler_like.py`.
+  - Multiplies a signal by a non-negative scalar to mimic distance-dependent Doppler attenuation.
+- Added function `add_baseline_noise` in `src/simulation/doppler_like.py`.
+  - Adds zero-mean Gaussian noise (seeded RNG) to a signal; returns an exact copy when `noise_std == 0`.
+- Added datatype `DopplerSignalResult` in `src/simulation/doppler_like.py`.
+  - Frozen dataclass carrying the final waveform, time axis, and all generation parameters.
+  - Includes `__post_init__` invariant validation, `sample_count()`, and `metadata()` methods.
+- Added function `generate_doppler_signal` in `src/simulation/doppler_like.py`.
+  - High-level entry point composing time-axis → envelope → carrier → modulation → scaling → noise into a single deterministic pipeline.
+  - Defaults: 48 kHz sample rate, 18 kHz carrier (DopFone-inspired).
+  - Returns `DopplerSignalResult` with full provenance metadata.
+- Updated `src/simulation/generator.py` to import `generate_heartbeat_envelope` from `doppler_like` (previously from `heartbeat`).
+- Expanded `tests/test_doppler_like.py` (56 tests total) with full 1/2/many/branch/statement coverage for:
+  - `generate_heartbeat_envelope` (shape, range, peak normalisation, different rates, invalid params)
+  - `apply_amplitude_scaling` (identity, zero/half, monotonic energy, invalid params)
+  - `add_baseline_noise` (zero-std copy, determinism under seed, std proportionality, invalid params)
+  - `DopplerSignalResult` (construction, metadata round-trip, invariant violations, shape mismatch)
+  - `generate_doppler_signal` (shape/defaults, seed determinism, parameter effects, amplitude monotonicity, metadata, all invalid params)
