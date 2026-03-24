@@ -8,7 +8,13 @@ writes a JSONL manifest summarising every example.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 from typing import Any, Dict, List
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
 from datatypes.signal_example import SignalExample
 from simulation.generator import (
@@ -30,9 +36,9 @@ from utils.io import read_yaml_file, write_manifest_jsonl, write_waveform_npy
 #   file with one record per example, each record including a ``waveform_path`` key.
 # - Mathematical definition: Not applicable; this is an orchestration entry point.
 def main(
-    config_path: str = "configs/generation.yaml",
-    output_dir: str = "data/waveforms/clean",
-    manifest_path: str = "data/manifests/clean_manifest.jsonl",
+    config_path: str = str(PROJECT_ROOT / "configs" / "generation.yaml"),
+    output_dir: str = str(PROJECT_ROOT / "data" / "waveforms" / "clean"),
+    manifest_path: str = str(PROJECT_ROOT / "data" / "manifests" / "clean_manifest.jsonl"),
 ) -> None:
     """Run the clean dataset build pipeline."""
     config: Dict[str, Any] = read_yaml_file(config_path)

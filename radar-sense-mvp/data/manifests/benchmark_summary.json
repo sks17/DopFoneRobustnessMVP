@@ -1,0 +1,26 @@
+{
+  "clean": {
+    "mean_absolute_error_bpm": 135.0,
+    "success_rate": 0.0
+  },
+  "perturbed": {
+    "mean_absolute_error_bpm": 104.1520205425331,
+    "success_rate": 0.05925925925925926,
+    "mae_by_artifact_type": {
+      "attenuation": 135.0,
+      "dropout": 135.0,
+      "gaussian_noise": 42.45606162759931
+    },
+    "mae_by_severity": {
+      "0.0": 135.0,
+      "0.25": 96.44002567816638,
+      "0.5": 96.44002567816638,
+      "0.75": 96.44002567816638,
+      "1.0": 96.44002567816638
+    }
+  },
+  "combined": {
+    "mean_absolute_error_bpm": 104.37884392089683,
+    "success_rate": 0.058823529411764705
+  }
+}

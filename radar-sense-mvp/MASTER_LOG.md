@@ -94,3 +94,105 @@ This file records each added datatype, method, test, and supporting project arti
   - `write_manifest_jsonl` / `read_manifest_jsonl` (1/2/many record round-trip, empty-raises, parent-dir creation)
   - `write_waveform_npy` (round-trip, two signals, dataset waveforms, wrong ndim, too short)
   - End-to-end pipeline: generate → serialize → write waveforms + manifest → read back and verify
+- Added function `severity_to_noise_std` in `src/perturbations/noise.py`.
+- Added function `apply_noise_with_severity` in `src/perturbations/noise.py`.
+- Added `size < 2` precondition to `add_gaussian_noise` in `src/perturbations/noise.py`.
+- Added function `severity_to_dropout_fraction` in `src/perturbations/dropout.py`.
+- Added function `apply_dropout_with_severity` in `src/perturbations/dropout.py`.
+- Added function `severity_to_attenuation_factor` in `src/perturbations/attenuation.py`.
+- Added function `apply_attenuation_with_severity` in `src/perturbations/attenuation.py`.
+- Added `size < 2` precondition to `apply_scalar_attenuation` in `src/perturbations/attenuation.py`.
+- Added function `build_severity_registry` in `src/perturbations/registry.py`.
+- Added function `list_perturbation_names` in `src/perturbations/registry.py`.
+- Added function `apply_perturbation_with_severity` in `src/perturbations/registry.py`.
+- Expanded test file `tests/test_noise.py` (~24 tests) with full 1/2/many/branch/statement coverage for:
+  - `add_gaussian_noise` (zero-std, determinism, shape, negative-std, wrong-ndim, too-short)
+  - `severity_to_noise_std` (zero, endpoints, monotonic, invalid severity, invalid max)
+  - `apply_noise_perturbation` (metadata, label preservation, shape)
+  - `apply_noise_with_severity` (zero severity, determinism, monotonic RMS increase, invalid seed, invalid severity)
+- Expanded test file `tests/test_dropout.py` (~25 tests) with full 1/2/many/branch/statement coverage for:
+  - `apply_contiguous_dropout` (zeroed segment, different starts, shape, zero fraction, wrong-ndim, too-short, invalid fractions)
+  - `severity_to_dropout_fraction` (zero, endpoints, monotonic, invalid severity, invalid max)
+  - `apply_dropout_perturbation` (metadata, label preservation, shape)
+  - `apply_dropout_with_severity` (zero severity, different severities, monotonic zeros, invalid severity, metadata)
+- Expanded test file `tests/test_attenuation.py` (~21 tests) with full 1/2/many/branch/statement coverage for:
+  - `apply_scalar_attenuation` (scaling, identity/zero, shape, negative factor, factor >1, wrong-ndim, too-short)
+  - `severity_to_attenuation_factor` (zero, endpoints, monotonic decrease, invalid severity)
+  - `apply_attenuation_perturbation` (metadata, label preservation, shape)
+  - `apply_attenuation_with_severity` (zero severity, full severity, monotonic RMS decrease, invalid severity, metadata)
+- Added test file `tests/test_registry.py` (~19 tests) with full 1/2/many/branch/statement coverage for:
+  - `build_perturbation_registry` (has noise, has dropout+attenuation, all callables)
+  - `build_severity_registry` (has noise, matches param registry keys, all callables)
+  - `list_perturbation_names` (returns list, sorted, contains all three)
+  - `apply_registered_perturbation` (noise, attenuation+dropout, unknown name)
+  - `apply_perturbation_with_severity` (noise, attenuation+dropout, all names, unknown name, invalid severity, shape preserved)
+- Rewrote `src/benchmark/dataset_builder.py` with RADAR-inspired benchmark expansion.
+  - Retained `build_clean_dataset` (config-driven clean generation, unchanged).
+  - Removed `build_perturbed_dataset` and `build_default_perturbation_parameters` (replaced by severity-based interface).
+  - Added function `expand_to_perturbed_dataset` — expands each clean example across the full cross-product of perturbation name x severity x seed using the severity-based registry.  Preserves the objective heart-rate label (RADAR invariant) through all perturbations.
+  - Added function `perturbed_example_to_record` — serialises a perturbed SignalExample to a JSONL-ready dict with full provenance (source_example_id, severity, seed).
+- Rewrote `scripts/build_perturbed_dataset.py` to use `expand_to_perturbed_dataset` with all registered perturbation names, a five-level severity grid, and config-derived seeds.  Writes per-example .npy waveforms and a JSONL manifest with provenance metadata.
+- Updated `scripts/run_benchmark.py` to import `expand_to_perturbed_dataset` instead of the removed `build_perturbed_dataset` / `build_default_perturbation_parameters`.
+- Rewrote test file `tests/test_dataset_builder.py` (22 tests) with full 1/2/many/branch/statement coverage for:
+  - `build_clean_dataset` (one rate, two rates, rate x count)
+  - `expand_to_perturbed_dataset` (single combo, two clean, full grid count, RADAR label preservation, metadata correctness, example_id provenance encoding, noise monotonic severity, attenuation monotonic severity, empty clean/names/severities/seeds raise ValueError, unknown name, invalid severity, negative seed)
+  - `perturbed_example_to_record` (provenance keys, different perturbation names, JSON serializability, label preservation)
+- Added function `load_waveform_npy` in `src/estimation/preprocess.py`.
+  - Loads a one-dimensional float64 waveform from a `.npy` file with validation.
+- Added function `normalize_signal` in `src/estimation/preprocess.py`.
+  - Zero-mean, unit-peak normalization; constant signals map to zeros.
+- Added function `bandpass_filter` in `src/estimation/preprocess.py`.
+  - Zero-phase Butterworth bandpass using `scipy.signal.butter` + `sosfiltfilt` (second-order sections for numerical stability).
+- Added function `extract_envelope` in `src/estimation/preprocess.py`.
+  - Amplitude envelope via Hilbert transform analytic signal; recovers heartbeat modulation from carrier-modulated Doppler signals.
+- Added test file `tests/test_preprocess.py` (37 tests) with full 1/2/many/branch/statement coverage for:
+  - `load_waveform_npy` (round-trip, two signals, various lengths, rejects 2-D, rejects too-short)
+  - `normalize_signal` (zero-mean + unit-peak, different scales, shape, constant signal, wrong-ndim, too-short, deterministic)
+  - `bandpass_filter` (passes in-band, rejects out-of-band, shape, deterministic, wrong-ndim, too-short, non-positive sample rate, non-positive low_hz, low >= high, high >= Nyquist, order < 1)
+  - `extract_envelope` (recovers AM modulation, non-negative, shape, deterministic, wrong-ndim, too-short)
+  - `rectify_signal` (non-negative, shape + dtype, wrong-ndim)
+  - `moving_average` (window 1 identity, window 1 vs 3, shape, zero window, wrong-ndim)
+- Replaced `src/estimation/peak_estimator.py` with a smaller, more explicit MVP FHR estimator based on envelope extraction, moving-average smoothing, thresholded peak detection, inter-peak intervals, and median-interval BPM estimation.
+- Added function `smoothing_seconds_to_window_size` in `src/estimation/peak_estimator.py`.
+- Added function `peak_distance_seconds_to_samples` in `src/estimation/peak_estimator.py`.
+- Added function `scale_to_unit_interval` in `src/estimation/peak_estimator.py`.
+- Added function `preprocess_waveform` in `src/estimation/peak_estimator.py`.
+- Added function `compute_peak_threshold` in `src/estimation/peak_estimator.py`.
+- Added function `detect_peak_indices` in `src/estimation/peak_estimator.py`.
+- Added function `peak_indices_to_intervals_seconds` in `src/estimation/peak_estimator.py`.
+- Added function `estimate_bpm_from_intervals` in `src/estimation/peak_estimator.py`.
+- Added function `estimate_heart_rate_bpm` in `src/estimation/peak_estimator.py`.
+- Replaced `tests/test_peak_estimator.py` with one-case, two-case, many-case, branch-case, and statement-case coverage for the new estimator pipeline, including clean synthetic accuracy checks against target BPM.
+- Added missing runtime dependency `scipy>=1.13` to `requirements.txt` and `pyproject.toml` because the preprocessing and estimator architecture now rely on `scipy.signal`.
+- Fixed `preprocess_waveform` in `src/estimation/peak_estimator.py` so constant waveforms map to zeros before smoothing, eliminating boundary artifacts and restoring the expected estimator edge-case behavior.
+- Fixed the script entry-point layer so `scripts/*.py` bootstrap `src/` onto `sys.path` and resolve paths from the project root, allowing the architecture to run from the command line.
+- Fixed provenance parsing in `scripts/build_perturbed_dataset.py` so `source_example_id`, `severity`, and `seed` are recovered correctly from the structured perturbed example identifier.
+- Relaxed the `BenchmarkResult` estimate invariant to allow `estimated_heart_rate_bpm == 0.0`, so end-to-end benchmark runs can represent failed detections without crashing.
+- Corrected `validate_benchmark_result` to enforce the relaxed zero-allowed estimate invariant in code, and added a regression test covering a zero-BPM failed-detection result.
+- Replaced `src/benchmark/metrics.py` with a smaller metrics layer covering per-example absolute error, MAE over result lists, identifier parsing for perturbed benchmark provenance, grouped MAE by artifact type, grouped MAE by severity, and retained success-rate aggregation for pipeline compatibility.
+- Added function `compute_absolute_error_bpm` in `src/benchmark/metrics.py`.
+- Added function `compute_mean_absolute_error_bpm` in `src/benchmark/metrics.py`.
+- Added function `compute_success_rate` in `src/benchmark/metrics.py`.
+- Added function `extract_artifact_type_from_example_id` in `src/benchmark/metrics.py`.
+- Added function `extract_severity_from_example_id` in `src/benchmark/metrics.py`.
+- Added function `group_results_by_artifact_type` in `src/benchmark/metrics.py`.
+- Added function `group_results_by_severity` in `src/benchmark/metrics.py`.
+- Added function `compute_grouped_mae_by_artifact_type` in `src/benchmark/metrics.py`.
+- Added function `compute_grouped_mae_by_severity` in `src/benchmark/metrics.py`.
+- Replaced `tests/test_metrics.py` with one-case, two-case, many-case, branch-case, and statement-case coverage for absolute error, overall MAE, grouped MAE by artifact type, grouped MAE by severity, and perturbed identifier parsing.
+- Replaced `src/benchmark/runner.py` with a manifest-aware benchmark execution layer that cleanly separates pure evaluation from file I/O.
+- Added function `evaluate_signal_example` in `src/benchmark/runner.py`.
+- Added function `run_example_level_benchmark` in `src/benchmark/runner.py`.
+- Added function `evaluate_manifest_record` in `src/benchmark/runner.py`.
+- Added function `evaluate_manifest_records` in `src/benchmark/runner.py`.
+- Added function `benchmark_result_to_record` in `src/benchmark/runner.py`.
+- Added function `benchmark_results_to_records` in `src/benchmark/runner.py`.
+- Retained function `summarize_benchmark_results` in `src/benchmark/runner.py` for overall summary compatibility.
+- Added function `summarize_clean_and_perturbed_results` in `src/benchmark/runner.py`.
+- Replaced `scripts/run_benchmark.py` with a manifest-driven benchmark entry point that reads clean and perturbed manifests, evaluates rows, writes result rows as JSONL or CSV, and writes summary JSON.
+- Added helper functions `write_result_rows_jsonl`, `write_result_rows_csv`, `write_result_rows`, and `resolve_project_path` in `scripts/run_benchmark.py`.
+- Replaced `scripts/summarize_results.py` with a result-row summarization script that reads JSONL or CSV rows, reconstructs benchmark results, and recomputes overall and grouped summaries.
+- Added helper functions `read_result_rows_jsonl`, `read_result_rows_csv`, `read_result_rows`, `row_to_benchmark_result`, `split_result_rows_by_dataset_split`, and `summarize_result_rows` in `scripts/summarize_results.py`.
+- Added `tests/test_runner.py` with one-case, two-case, many-case, branch-case, and small end-to-end benchmark execution coverage for the runner and manifest-driven scripts.
+- Updated `configs/benchmark.yaml` to use manifest JSONL inputs plus explicit result-row and summary output paths.
+- Added root script `run_local_master_stats.py` for quick local master-statistics extraction before large HPC sweeps, with a conservative twenty-minute local trial-throughput estimate in the header comment.

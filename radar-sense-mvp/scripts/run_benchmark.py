@@ -1,64 +1,163 @@
-"""Run the RADAR-Sense-MVP benchmark."""
+"""Run the manifest-driven RADAR-Sense-MVP benchmark."""
 
 from __future__ import annotations
 
-from benchmark.dataset_builder import (
-    build_clean_dataset,
-    build_default_perturbation_parameters,
-    build_perturbed_dataset,
+import csv
+import json
+from pathlib import Path
+import sys
+from typing import Any
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from benchmark.runner import (
+    benchmark_results_to_records,
+    evaluate_manifest_records,
+    summarize_clean_and_perturbed_results,
 )
-from benchmark.runner import run_example_level_benchmark, summarize_benchmark_results
-from utils.io import read_yaml_file, write_json_file
+from estimation.preprocess import load_waveform_npy
+from utils.io import read_manifest_jsonl, read_yaml_file, write_json_file
+
+
+RESULT_FIELD_NAMES: list[str] = [
+    "dataset_split",
+    "example_id",
+    "true_heart_rate_bpm",
+    "estimated_heart_rate_bpm",
+    "absolute_error_bpm",
+    "within_tolerance",
+    "artifact_type",
+    "severity",
+]
 
 
 # Spec:
-# - General description: Convert benchmark results to JSON-serializable dictionaries.
-# - Params: `results`, list of benchmark result values.
-# - Pre: Each element in `results` is valid.
-# - Post: Returns a list of dictionaries ready for JSON serialization.
-# - Mathematical definition: Applies a field-preserving map from datatype values to JSON-compatible records.
-def serialize_results(results: list[object]) -> list[dict[str, object]]:
-    """Return a JSON-serializable benchmark-result representation."""
-    serialized_results: list[dict[str, object]] = []
-    for result in results:
-        serialized_results.append(
-            {
-                "example_id": result.example_id,
-                "true_heart_rate_bpm": result.true_heart_rate_bpm,
-                "estimated_heart_rate_bpm": result.estimated_heart_rate_bpm,
-                "absolute_error_bpm": result.absolute_error_bpm,
-                "within_tolerance": result.within_tolerance,
-            }
-        )
-    return serialized_results
+# - General description: Convert benchmark results to serializable row dictionaries for one dataset split.
+# - Params: `results`, list of benchmark results; `dataset_split`, either `clean` or `perturbed`.
+# - Pre: `dataset_split` is `clean` or `perturbed`.
+# - Post: Returns one row dictionary per result.
+# - Mathematical definition: rows_i = benchmark_results_to_records(results_i, dataset_split).
+def serialize_results(
+    results: list[object],
+    dataset_split: str,
+) -> list[dict[str, object]]:
+    """Return serializable benchmark result rows."""
+    return benchmark_results_to_records(results, dataset_split)
 
 
 # Spec:
-# - General description: Run the default benchmark pipeline and write result artifacts.
-# - Params: None.
-# - Pre: Config files exist and are valid.
-# - Post: Writes `data/manifests/benchmark_results.json`.
-# - Mathematical definition: Not applicable; this is an orchestration entry point.
-def main() -> None:
-    """Run the benchmark entry point."""
-    generation_config = read_yaml_file("configs/generation.yaml")
-    benchmark_config = read_yaml_file("configs/benchmark.yaml")
-    clean_dataset = build_clean_dataset(generation_config)
-    perturbation_parameters = build_default_perturbation_parameters(
-        perturbation_name="gaussian_noise",
-        seed=int(generation_config["seed"]),
+# - General description: Write a list of result rows to a JSONL file.
+# - Params: `path`, output file path; `rows`, list of serializable row dictionaries.
+# - Pre: `rows` is non-empty.
+# - Post: Writes one JSON object per line.
+# - Mathematical definition: line_i = json.dumps(rows_i).
+def write_result_rows_jsonl(path: str | Path, rows: list[dict[str, object]]) -> None:
+    """Write benchmark result rows to a JSONL file."""
+    if len(rows) == 0:
+        raise ValueError("rows must be non-empty.")
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8") as output_file:
+        for row in rows:
+            output_file.write(json.dumps(row) + "\n")
+
+
+# Spec:
+# - General description: Write a list of result rows to a CSV file.
+# - Params: `path`, output file path; `rows`, list of serializable row dictionaries.
+# - Pre: `rows` is non-empty.
+# - Post: Writes one CSV header row followed by one data row per result.
+# - Mathematical definition: Not applicable; this is tabular file serialization.
+def write_result_rows_csv(path: str | Path, rows: list[dict[str, object]]) -> None:
+    """Write benchmark result rows to a CSV file."""
+    if len(rows) == 0:
+        raise ValueError("rows must be non-empty.")
+    output_path = Path(path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8", newline="") as output_file:
+        writer = csv.DictWriter(output_file, fieldnames=RESULT_FIELD_NAMES)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+# Spec:
+# - General description: Write benchmark result rows using either JSONL or CSV format.
+# - Params: `path`, output file path; `rows`, non-empty row list; `output_format`, either `jsonl` or `csv`.
+# - Pre: `rows` is non-empty and `output_format` is supported.
+# - Post: Writes the result rows to disk.
+# - Mathematical definition: Dispatches to either JSONL or CSV serialization.
+def write_result_rows(
+    path: str | Path,
+    rows: list[dict[str, object]],
+    output_format: str,
+) -> None:
+    """Write benchmark result rows to the requested format."""
+    if output_format == "jsonl":
+        write_result_rows_jsonl(path, rows)
+        return
+    if output_format == "csv":
+        write_result_rows_csv(path, rows)
+        return
+    raise ValueError("output_format must be either 'jsonl' or 'csv'.")
+
+
+# Spec:
+# - General description: Resolve a project-relative path from configuration.
+# - Params: `path_text`, path string from configuration.
+# - Pre: `path_text` is non-empty.
+# - Post: Returns an absolute `Path`.
+# - Mathematical definition: resolved_path = PROJECT_ROOT / path_text when relative, else Path(path_text).
+def resolve_project_path(path_text: str) -> Path:
+    """Return an absolute path resolved from the project root."""
+    if path_text.strip() == "":
+        raise ValueError("path_text must be non-empty.")
+    path = Path(path_text)
+    if path.is_absolute():
+        return path
+    return PROJECT_ROOT / path
+
+
+# Spec:
+# - General description: Run the benchmark over clean and perturbed manifests and write result rows plus summary artifacts.
+# - Params: `config_path`, path to the benchmark YAML config.
+# - Pre: `config_path` exists and the referenced manifests exist.
+# - Post: Writes benchmark result rows and a summary JSON file.
+# - Mathematical definition: clean_results = E(clean_manifest), perturbed_results = E(perturbed_manifest), summary = summarize_clean_and_perturbed_results(clean_results, perturbed_results).
+def main(config_path: str | Path = PROJECT_ROOT / "configs" / "benchmark.yaml") -> None:
+    """Run the benchmark over clean and perturbed manifests."""
+    benchmark_config: dict[str, Any] = read_yaml_file(config_path)
+    clean_manifest_path = resolve_project_path(str(benchmark_config["clean_manifest_path"]))
+    perturbed_manifest_path = resolve_project_path(str(benchmark_config["perturbed_manifest_path"]))
+    result_rows_path = resolve_project_path(str(benchmark_config["result_rows_path"]))
+    summary_path = resolve_project_path(str(benchmark_config["summary_path"]))
+    output_format = str(benchmark_config.get("result_rows_format", "jsonl"))
+    tolerance_bpm = float(benchmark_config.get("tolerance_bpm", 10.0))
+
+    clean_manifest_records = read_manifest_jsonl(clean_manifest_path)
+    perturbed_manifest_records = read_manifest_jsonl(perturbed_manifest_path)
+
+    clean_results = evaluate_manifest_records(
+        clean_manifest_records,
+        waveform_loader=load_waveform_npy,
+        tolerance_bpm=tolerance_bpm,
     )
-    perturbed_dataset = build_perturbed_dataset(
-        clean_dataset=clean_dataset,
-        perturbation_name="gaussian_noise",
-        parameters=perturbation_parameters,
+    perturbed_results = evaluate_manifest_records(
+        perturbed_manifest_records,
+        waveform_loader=load_waveform_npy,
+        tolerance_bpm=tolerance_bpm,
     )
-    results = run_example_level_benchmark(perturbed_dataset, tolerance_bpm=10.0)
-    summary = summarize_benchmark_results(results)
-    write_json_file(
-        benchmark_config["results_path"],
-        {"results": serialize_results(results), "summary": summary},
+
+    result_rows = (
+        serialize_results(clean_results, dataset_split="clean")
+        + serialize_results(perturbed_results, dataset_split="perturbed")
     )
+    summary = summarize_clean_and_perturbed_results(clean_results, perturbed_results)
+
+    write_result_rows(result_rows_path, result_rows, output_format=output_format)
+    write_json_file(summary_path, summary)
 
 
 if __name__ == "__main__":

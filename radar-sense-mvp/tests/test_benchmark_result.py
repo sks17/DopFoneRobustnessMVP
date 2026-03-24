@@ -45,12 +45,19 @@ def test_benchmark_result_many_case_validation_passes() -> None:
         validate_benchmark_result(result)
 
 
+def test_benchmark_result_statement_case_allows_zero_estimate() -> None:
+    """Statement-coverage test for a failed detection represented as zero BPM."""
+    result = create_benchmark_result("r-zero", 120.0, 0.0, tolerance_bpm=5.0)
+    assert result.estimated_heart_rate_bpm == 0.0
+    assert result.within_tolerance is False
+
+
 @pytest.mark.parametrize(
     ("example_id", "true_rate", "estimated_rate", "absolute_error"),
     [
         ("", 120.0, 121.0, 1.0),
         ("bad-true", 0.0, 121.0, 1.0),
-        ("bad-estimated", 120.0, 0.0, 1.0),
+        ("bad-estimated", 120.0, -1.0, 1.0),
         ("bad-abs", 120.0, 121.0, -1.0),
     ],
 )

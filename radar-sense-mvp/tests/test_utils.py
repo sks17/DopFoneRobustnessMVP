@@ -7,8 +7,7 @@ from pathlib import Path
 import pytest
 
 from benchmark.dataset_builder import build_clean_dataset
-from benchmark.runner import run_example_level_benchmark
-from scripts.run_benchmark import serialize_results
+from benchmark.runner import benchmark_results_to_records, run_example_level_benchmark
 from scripts.summarize_results import read_json_file
 from simulation.generator import signal_example_to_record
 from utils.io import read_yaml_file, write_json_file
@@ -50,7 +49,10 @@ def test_io_and_script_serializers_many_case_round_trip(tmp_path: Path) -> None:
     json_path = tmp_path / "results.json"
     write_json_file(
         json_path,
-        {"dataset": [signal_example_to_record(ex) for ex in dataset], "results": serialize_results(results)},
+        {
+            "dataset": [signal_example_to_record(ex) for ex in dataset],
+            "results": benchmark_results_to_records(results, dataset_split="clean"),
+        },
     )
     json_data = read_json_file(str(json_path))
 

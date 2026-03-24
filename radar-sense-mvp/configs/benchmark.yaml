@@ -1,7 +1,12 @@
 benchmark_name: radar_sense_mvp
-clean_manifest_path: data/manifests/clean_manifest.json
-perturbed_manifest_path: data/manifests/perturbed_manifest.json
-results_path: data/manifests/benchmark_results.json
+clean_manifest_path: data/manifests/clean_manifest.jsonl
+perturbed_manifest_path: data/manifests/perturbed_manifest.jsonl
+result_rows_path: data/manifests/benchmark_results.jsonl
+summary_path: data/manifests/benchmark_summary.json
+result_rows_format: jsonl
+tolerance_bpm: 10.0
 metrics:
   - mean_absolute_error_bpm
   - success_rate
+  - mae_by_artifact_type
+  - mae_by_severity

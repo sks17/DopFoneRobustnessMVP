@@ -15,14 +15,14 @@ class BenchmarkResult:
     Concrete state:
     - `example_id`: stable identifier for the evaluated example.
     - `true_heart_rate_bpm`: positive label.
-    - `estimated_heart_rate_bpm`: positive estimate.
+    - `estimated_heart_rate_bpm`: non-negative estimate.
     - `absolute_error_bpm`: non-negative absolute error.
     - `within_tolerance`: whether the estimate falls within a fixed tolerance.
 
     Representation invariants:
     - `example_id` is non-empty.
     - `true_heart_rate_bpm > 0`.
-    - `estimated_heart_rate_bpm > 0`.
+    - `estimated_heart_rate_bpm >= 0`.
     - `absolute_error_bpm >= 0`.
 
     Abstraction function:
@@ -44,7 +44,7 @@ class BenchmarkResult:
     # - Params: `self`, the newly constructed benchmark result.
     # - Pre: Constructor fields are populated.
     # - Post: All representation invariants hold.
-    # - Mathematical definition: absolute_error_bpm >= 0 and rate values lie in R_{>0}.
+    # - Mathematical definition: absolute_error_bpm >= 0, true rate lies in R_{>0}, and estimated rate lies in R_{>=0}.
     def __post_init__(self) -> None:
         """Validate representation invariants for the benchmark result."""
         validate_benchmark_result(self)
@@ -63,7 +63,7 @@ class BenchmarkResult:
 # Spec:
 # - General description: Construct a validated `BenchmarkResult` from a true label and estimate.
 # - Params: `example_id`, `true_heart_rate_bpm`, `estimated_heart_rate_bpm`, `tolerance_bpm`.
-# - Pre: Heart-rate values and tolerance are positive; `example_id` is non-empty.
+# - Pre: True heart-rate and tolerance are positive, estimated heart-rate is non-negative, and `example_id` is non-empty.
 # - Post: Returns a `BenchmarkResult` whose absolute error and tolerance flag are consistent with the inputs.
 # - Mathematical definition: error = |y_hat - y| and within_tolerance = [error <= tolerance].
 def create_benchmark_result(
@@ -98,7 +98,7 @@ def validate_benchmark_result(benchmark_result: BenchmarkResult) -> None:
         raise ValueError("example_id must be non-empty.")
     if benchmark_result.true_heart_rate_bpm <= 0.0:
         raise ValueError("true_heart_rate_bpm must be positive.")
-    if benchmark_result.estimated_heart_rate_bpm <= 0.0:
-        raise ValueError("estimated_heart_rate_bpm must be positive.")
+    if benchmark_result.estimated_heart_rate_bpm < 0.0:
+        raise ValueError("estimated_heart_rate_bpm must be non-negative.")
     if benchmark_result.absolute_error_bpm < 0.0:
         raise ValueError("absolute_error_bpm must be non-negative.")
