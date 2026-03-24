@@ -73,3 +73,24 @@ This file records each added datatype, method, test, and supporting project arti
   - `add_baseline_noise` (zero-std copy, determinism under seed, std proportionality, invalid params)
   - `DopplerSignalResult` (construction, metadata round-trip, invariant violations, shape mismatch)
   - `generate_doppler_signal` (shape/defaults, seed determinism, parameter effects, amplitude monotonicity, metadata, all invalid params)
+- Added function `signal_example_to_record` in `src/simulation/generator.py`.
+  - Pure serialization of a `SignalExample` to a JSON-compatible dict (no raw signal — samples belong in `.npy` files).
+  - Keys: `example_id`, `sample_rate_hz`, `heart_rate_bpm`, `is_perturbed`, `perturbation_name`, `sample_count`.
+- Added function `generate_clean_dataset` in `src/simulation/generator.py`.
+  - Batch generation of N clean `SignalExample` items with deterministic per-example seeds (`base_seed + i`).
+  - Example IDs follow the pattern `clean-{bpm}-s{seed}`.
+- Added function `write_manifest_jsonl` in `src/utils/io.py`.
+  - Writes a list of dicts as a JSONL file (one compact JSON object per line).
+- Added function `read_manifest_jsonl` in `src/utils/io.py`.
+  - Reads a JSONL manifest file back into a list of dicts (inverse of `write_manifest_jsonl`).
+- Added function `write_waveform_npy` in `src/utils/io.py`.
+  - Saves a one-dimensional float64 waveform as a `.npy` file with parent-directory auto-creation.
+- Rewrote `scripts/build_clean_dataset.py` to use `generate_clean_dataset`, `signal_example_to_record`, `write_waveform_npy`, and `write_manifest_jsonl`.
+  - Writes per-example `.npy` waveforms and a JSONL manifest with `waveform_path` pointers.
+- Updated `tests/test_utils.py` to use `signal_example_to_record` (replaced removed `serialize_dataset` import).
+- Added test file `tests/test_generator.py` (26 tests) with full 1/2/many/branch/statement coverage for:
+  - `signal_example_to_record` (keys, clean vs perturbed, JSON serializability)
+  - `generate_clean_dataset` (N=1, N=2, N=5, determinism, all invalid params)
+  - `write_manifest_jsonl` / `read_manifest_jsonl` (1/2/many record round-trip, empty-raises, parent-dir creation)
+  - `write_waveform_npy` (round-trip, two signals, dataset waveforms, wrong ndim, too short)
+  - End-to-end pipeline: generate → serialize → write waveforms + manifest → read back and verify
