@@ -1,0 +1,7 @@
+benchmark_name: radar_sense_mvp
+clean_manifest_path: data/manifests/clean_manifest.json
+perturbed_manifest_path: data/manifests/perturbed_manifest.json
+results_path: data/manifests/benchmark_results.json
+metrics:
+  - mean_absolute_error_bpm
+  - success_rate

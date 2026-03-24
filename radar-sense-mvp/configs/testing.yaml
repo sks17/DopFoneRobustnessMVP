@@ -1,0 +1,7 @@
+pytest_command: pytest
+minimum_statement_coverage: 0.95
+required_case_categories:
+  - one_case
+  - two_case
+  - many_case
+  - branch_case

@@ -1,0 +1,9 @@
+seed: 7
+sample_rate_hz: 2000
+duration_seconds: 12.0
+carrier_frequency_hz: 18000.0
+heart_rate_bpm_values:
+  - 120.0
+  - 135.0
+  - 150.0
+examples_per_rate: 3
