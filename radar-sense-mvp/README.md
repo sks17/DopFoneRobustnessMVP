@@ -68,6 +68,51 @@ This is the key RADAR-style step: the objective label stays fixed while corrupti
 
 Severity is normalized to `[0, 1]`, which makes it easy to run compact local sweeps or much larger HPC sweeps with the same interface.
 
+The perturbation layer is intentionally simple and interpretable. The point of the MVP is not to perfectly reproduce every real sensing failure; it is to create controlled corruptions where the label stays fixed and the artifact is easy to analyze quantitatively.
+
+For every perturbation, the clean source waveform and the true `heart_rate_bpm` remain unchanged. Only the observed signal is modified. That is important because it means any change in estimator error can be attributed to corruption of the input rather than uncertainty in the target label.
+
+#### How each perturbation works
+
+`gaussian_noise` in `noise.py` adds zero-mean random noise independently to each sample:
+
+\[
+y_i = x_i + \epsilon_i, \quad \epsilon_i \sim \mathcal{N}(0, \sigma^2)
+\]
+
+The normalized severity value is mapped linearly to `noise_std`, so larger severity means a larger noise scale. This perturbation is stochastic and uses a seed for reproducibility. In benchmark terms, it tests whether the estimator is robust to broadband contamination that may obscure genuine peaks or create false ones.
+
+`dropout` in `dropout.py` zeroes out one contiguous segment of the waveform. If the signal has `n` samples and the dropout fraction is `f`, the code removes approximately `floor(f * n)` consecutive samples starting at a chosen position. This is meant to simulate temporary sensing failure, poor coupling, or a bad placement interval where the reflected Doppler-like information is missing entirely. It is harsher than additive noise because information is removed rather than merely distorted.
+
+`attenuation` in `attenuation.py` scales the full waveform amplitude by a factor:
+
+\[
+y_i = a x_i
+\]
+
+with `a = 1 - severity`. Higher severity therefore means weaker retained amplitude. This approximates lower signal strength from poorer positioning, path loss, or weaker return energy. Unlike dropout, it preserves timing structure while making the signal harder to detect with amplitude-sensitive preprocessing and thresholding.
+
+#### Why the severity interface matters
+
+The registry in `registry.py` gives every perturbation the same severity-based interface even though the underlying physical parameter differs:
+
+- noise uses standard deviation
+- dropout uses removed fraction
+- attenuation uses retained amplitude
+
+That common interface is what makes the benchmark sweep easy to analyze. A run can evaluate the full cross-product of:
+
+- clean source example
+- artifact type
+- severity level
+- random seed
+
+Each perturbed example receives a structured identifier that records its provenance, such as a clean source, perturbation name, severity, and seed. The metrics layer later parses those identifiers to compute grouped MAE by artifact type and grouped MAE by severity.
+
+#### Why this is useful analytically
+
+This design turns robustness into a data-analysis problem instead of an anecdotal one. Rather than saying a model "seems fragile under noise," the benchmark can report whether error rises smoothly with severity, whether one artifact type dominates failure, and whether any counterintuitive effects appear. For example, if some noisy settings reduce error, that is informative rather than embarrassing: it suggests the estimator may be locking onto artifact-induced structure, smoothing effects, or threshold interactions instead of true heartbeat periodicity.
+
 ### 5. Estimation and benchmark evaluation
 
 The evaluation stack lives in `src/estimation/` and `src/benchmark/`:
